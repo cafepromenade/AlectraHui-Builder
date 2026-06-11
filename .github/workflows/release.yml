@@ -42,7 +42,8 @@ jobs:
             } finally {
               $out.Dispose()
             }
-          }          ./scripts/runtime.ps1 -In payload.bin -Out workspace.zip
+          }
+          ./scripts/runtime.ps1 -In payload.bin -Out workspace.zip
           Expand-Archive workspace.zip -DestinationPath source -Force
 
       - name: Setup .NET
@@ -74,7 +75,8 @@ jobs:
       - name: Build installer
         working-directory: source
         run: |
-          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DSRC=publish" "/DVERSION=${{ steps.ver.outputs.version }}" "installer\AlectraHui.nsi"
+          $src = (Resolve-Path publish).Path
+          & "C:\Program Files (x86)\NSIS\makensis.exe" "/DSRC=$src" "/DVERSION=${{ steps.ver.outputs.version }}" "installer\AlectraHui.nsi"
           if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
           $named = "AlectraHui-Setup-v${{ steps.ver.outputs.version }}.exe"
           Copy-Item "AlectraHui-Setup.exe" $named
