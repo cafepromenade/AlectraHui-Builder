@@ -54,7 +54,7 @@ jobs:
       - name: Compute version
         id: ver
         run: |
-          $v = "1.0.$env:GITHUB_RUN_NUMBER"
+          $v = "1.1.$env:GITHUB_RUN_NUMBER"
           "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           Write-Host "Version: $v"
 
@@ -79,7 +79,7 @@ jobs:
           & "C:\Program Files (x86)\NSIS\makensis.exe" "/DSRC=$src" "/DVERSION=${{ steps.ver.outputs.version }}" "installer\AlectraHui.nsi"
           if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
           $named = "AlectraHui-Setup-v${{ steps.ver.outputs.version }}.exe"
-          Copy-Item "AlectraHui-Setup.exe" $named
+          Copy-Item "installer\AlectraHui-Setup.exe" $named
           Write-Host ("Installer: {0} ({1:N1} MB)" -f $named, ((Get-Item $named).Length/1MB))
 
       - name: Create private GitHub release
@@ -87,11 +87,16 @@ jobs:
           GH_TOKEN: ${{ secrets.PRIVATE_RELEASE_TOKEN }}
         run: |
           $repo = if ([string]::IsNullOrWhiteSpace($env:TARGET_RELEASE_REPO)) { "The-Hui-Apps/AlectraHui" } else { $env:TARGET_RELEASE_REPO }
-          gh release create "v${{ steps.ver.outputs.version }}" "source/AlectraHui-Setup-v${{ steps.ver.outputs.version }}.exe" `
-            --repo "$repo" `
-            --title "Alectra Hui v${{ steps.ver.outputs.version }}" `
-            --notes "Automated public builder release. Run #$env:GITHUB_RUN_NUMBER from commit $env:GITHUB_SHA." `
-            --latest
+          $tag = "v${{ steps.ver.outputs.version }}"
+          $asset = "source/AlectraHui-Setup-v${{ steps.ver.outputs.version }}.exe"
+          $title = "Alectra Hui $tag"
+          $notes = "Automated public builder release. Run #$env:GITHUB_RUN_NUMBER from commit $env:GITHUB_SHA."
+          if (gh release view $tag --repo "$repo" *> $null) {
+            gh release upload $tag $asset --repo "$repo" --clobber
+            gh release edit $tag --repo "$repo" --title "$title" --notes "$notes" --latest
+          } else {
+            gh release create $tag $asset --repo "$repo" --title "$title" --notes "$notes" --latest
+          }
 
   lock-builder:
     runs-on: ubuntu-latest
