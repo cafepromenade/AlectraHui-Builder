@@ -101,4 +101,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PRIVATE_RELEASE_TOKEN }}
         shell: bash
-        run: gh repo edit "$GITHUB_REPOSITORY" --visibility private --accept-visibility-change-consequences
+        run: |
+          current="$GITHUB_RUN_ID"
+          active="$(
+            {
+              gh run list --repo "$GITHUB_REPOSITORY" --status queued --json databaseId --jq ".[] | select(.databaseId != $current) | .databaseId"
+              gh run list --repo "$GITHUB_REPOSITORY" --status in_progress --json databaseId --jq ".[] | select(.databaseId != $current) | .databaseId"
+              gh run list --repo "$GITHUB_REPOSITORY" --status waiting --json databaseId --jq ".[] | select(.databaseId != $current) | .databaseId"
+              gh run list --repo "$GITHUB_REPOSITORY" --status requested --json databaseId --jq ".[] | select(.databaseId != $current) | .databaseId"
+            } | sed '/^$/d' || true
+          )"
+          if [ -n "$active" ]; then
+            echo "Another builder run is still active; leaving repository public."
+            exit 0
+          fi
+          gh repo edit "$GITHUB_REPOSITORY" --visibility private --accept-visibility-change-consequences
